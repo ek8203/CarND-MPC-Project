@@ -58,21 +58,21 @@ class FG_eval {
     // any anything you think may be beneficial.
     // The part of the cost based on the reference state.
     for (int t = 0; t < N; t++) {
-      fg[0] += CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += 200*CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += 200*CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
 
     // Minimize the use of actuators.
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 50000*CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += 50*CppAD::pow(vars[a_start + t], 2);
     }
 
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 500*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += 200*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 10*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
     //
@@ -113,8 +113,10 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-      AD<double> psides0 = CppAD::atan(coeffs[1]);
+      // 3rd order polynomial
+      AD<double> f0 = coeffs[0] + coeffs[1]*x0  + coeffs[2]*x0*x0 + coeffs[3]*x0*x0*x0;
+      // derivative f0'
+      AD<double> psides0 = CppAD::atan(coeffs[1] + 2*coeffs[2]*x0 + 3*coeffs[3]*x0*x0);
 
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
@@ -274,5 +276,15 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
   //return {};
-  return {solution.x[delta_start],   solution.x[a_start]};
+  vector<double> results;
+
+  results.push_back(solution.x[delta_start]);
+  results.push_back(solution.x[a_start]);
+
+  for (int i = 1; i < N-1; i++) {
+    results.push_back(solution.x[x_start + i]);
+    results.push_back(solution.x[y_start + i]);
+  }
+
+  return results;
 }

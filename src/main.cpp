@@ -137,14 +137,15 @@ int main() {
           Eigen::VectorXd state(6);
           //state << px, py, psi, v, cte, epsi;
           state << 0, 0, 0, v, cte, epsi;
-#if 1
+
           auto vars = mpc.Solve(state, coeffs);
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          const double Lf = 2.67;
-          msgJson["steering_angle"] = vars[0]/(deg2rad(25) * Lf); //steer_value;
+          //const double Lf = 2.67;
+          //msgJson["steering_angle"] = vars[0]/(deg2rad(25) * Lf); //steer_value;
+          msgJson["steering_angle"] = -vars[0]/deg2rad(25); //steer_value;
           msgJson["throttle"] = vars[1]; //throttle_value;
 
           //Display the MPC predicted trajectory 
@@ -166,11 +167,6 @@ int main() {
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
-#else
-          json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = throttle_value;
-#endif
 
           // Display the waypoints/reference line
           vector<double> next_x_vals;
@@ -191,7 +187,7 @@ int main() {
           msgJson["next_y"] = next_y_vals;
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
+          //std::cout << msg << std::endl;
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
@@ -201,7 +197,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          //this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
