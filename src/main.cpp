@@ -99,8 +99,16 @@ int main() {
           *
           */
           // Get steering and throttle from JSON object as above
-          //double steer_value = j[1]["steering_angle"];
-          //double throttle_value = j[1]["throttle"];
+          double steer_value = j[1]["steering_angle"];
+          double throttle_value = j[1]["throttle"];
+
+          // add latency - predict state in 100ms
+          double latency = 0.1;
+          const double Lf = 2.67;
+          px = px + v*cos(psi)*latency;
+          py = py + v*sin(psi)*latency;
+          psi = psi - v*steer_value/Lf*latency;
+          v = v + throttle_value*latency;
 
           // Transform waypoints from global coordinates to vehicle coordinates
           for (size_t i = 0; i < ptsx.size(); i++) {
@@ -124,12 +132,15 @@ int main() {
           // The cross track error is calculated by evaluating at polynomial at x, f(x)
           // and subtracting y.
           // double cte = polyeval(coeffs, px) - py;
-          // Because we shifted the position to the center py = 0 and py = 0:
+          // Because we shifted the position to the center px = 0 and py = 0:
           double cte = polyeval(coeffs, 0);
 
           // Due to the sign starting at 0, the orientation error is -f'(x).
-          // derivative of coeffs[0] + coeffs[1] * x -> coeffs[1]
-          // double epsi = psi - atan(coeffs[1]);
+          // derivative of the 3rd order polynomial:
+          // f(x) = coeffs[0] + coeffs[1] * x + coeffs[2] * x^2 + coeffs[3] * x^3 is
+          // f'(x) = coeffs[1] + 2 * coeffs[2] * x + 3 * coeffs[3] * x^2
+          // Because x = y = 0 in the center of coord. system
+          // double epsi = psi - atan(f'(x)) = psi - atan(coeffs[1]);
           // The car is moving to x-direction, so psi = 0
           double epsi = /* 0 */ - atan(coeffs[1]);
 
