@@ -102,7 +102,7 @@ int main() {
           double steer_value = j[1]["steering_angle"];
           double throttle_value = j[1]["throttle"];
 
-          // add latency - predict state in 100ms
+          // add latency - predict state at dt=0.1
           double latency = 0.1;
           const double Lf = 2.67;
           px = px + v*cos(psi)*latency;
