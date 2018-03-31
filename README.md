@@ -6,7 +6,7 @@
 
 ### Overview
 ---
-The goal of this project is to implement Model Predictive Control (MPC) to drive a vehicle around a simulated road track. A cross track error (CTE) is calculated in the project code. Additionally, there's a 100 millisecond latency between actuations commands on top of the connection latency. 
+The goal of this project is to implement Model Predictive Control (MPC) and to drive a vehicle around a simulated road track. A cross track error (CTE) is calculated in the project code. Additionally, there's a 100 millisecond latency between actuations commands on top of the connection latency. 
 
 The project includes following steps:
 * Complete the [project template](https://github.com/udacity/CarND-MPC-Project) C++ source code in order to build the MPC
@@ -29,13 +29,13 @@ The project code was built and executed on a VMware Linux guest.
 
 1. Make a build directory: `mkdir build && cd build`
 2. Compile the code: `cmake ../src/ && make` (Note that `CMakeList.txt` file is located in folder `src/`)
-3. Run the code: `./mpc`. A full format of the command string: `./mpc <target_speed>`, where  `<target_speed>` is a desired target speed (default 40mph)
+3. Run the code: `./mpc`
 
 ### Here I will consider the [rubric](https://review.udacity.com/#!/rubrics/896/view) points individually and describe how I addressed each point in my implementation.  
 
 #### The Model
 
-The implemented MPC is using a global kinematic model to calculate a predicted vehicle trajectory. In the project the kinematic model is using a vehicle `state` as a vector of 6 elements:
+The implemented MPC is using a global kinematic model to calculate a predicted vehicle trajectory. In the project the kinematic model receives a vehicle `state` as a vector of 6 elements:
  
 * vehicle position coordinates `x` and `y`
 * vehicle orientation `psi`
@@ -43,7 +43,7 @@ The implemented MPC is using a global kinematic model to calculate a predicted v
 * vehicle cross track error `cte` and
 * vehicle orientation error `epsi`
 
-The first four `state` vector elements at a timestep `t` are received from the vehicle [simulator](https://github.com/udacity/self-driving-car-sim/releases):
+The first four `state` vector elements at a timestep `t` are provided by the vehicle [simulator](https://github.com/udacity/self-driving-car-sim/releases):
 
 * current vehicle position coordinates `x[t]` and `y[t]`
 * vehicle orientation `psi[t]` in radians
@@ -51,7 +51,7 @@ The first four `state` vector elements at a timestep `t` are received from the v
 
 The other two `state` vector elements, `cte[t]` and `epsi[t]`, are calculated. 
 
-The cross track error `cte[t]` is calculated as a error of the vehicle position in `y` direction by evaluating the vehicle position `x` and substracting vehicle `y` position. The simulator provides 6 track waypoints at any timestep `t` as 2 vectors `ptsx` and `ptsy` in global map coordinate system. In order to be evaluated against the actual vehicle position the track waypoints coordinates are transformed from global coordinates to the vehicle coordinate system. This is done by shifting the center of the coordinate system to the vehicle position and rotating it (counterclockwise) `-psi` radians to get zero orientation angle in `x` direction:
+The cross track error `cte[t]` is calculated as a error of the vehicle position in `y` direction by evaluating the vehicle position at `x` and substracting the `y` coordinate. The simulator provides 6 track waypoints at any timestep `t` as 2 vectors `ptsx` and `ptsy` in global map coordinate system. In order to be evaluated against the actual vehicle position the track waypoints coordinates are transformed from global coordinates to the vehicle coordinate system. This is done by shifting the center of the coordinate system to the vehicle position and rotating it (counterclockwise) `-psi` radians to get zero orientation angle in `x` direction:
 ```cplusplus
 // Shift coordinates to the center
 double shift_x = ptsx[i] - px;
@@ -61,11 +61,11 @@ double shift_y = ptsy[i] - py;
 ptsx[i] = shift_x * cos(-psi) - shift_y * sin(-psi);
 ptsy[i] = shift_x * sin(-psi) + shift_y * cos(-psi);
 ```
-The transformed track waypoints are used to build an order 3 polynomial `f(x)` by `polyfit` method. The resulting polymomial coeffitients are evaluated against the vehicle `y` position by `polyeval` method to calculate the cross track error `cte`. Since the vehicle is located in the center of the coordinate system, `x` and `y` are `= 0`, and `cte = polyeval(coeffs, 0);`.
+The transformed track waypoints are used to build a 3rd order polynomial `f(x)` by `polyfit` method. The resulting polymomial coeffitients are evaluated against the vehicle `y` position by `polyeval` method to calculate the cross track error `cte`. Since the vehicle is located in the center of the coordinate system, `x` and `y` are `0`, and `cte = polyeval(coeffs, 0);`.
  
-The vehicle orientation error `epsi` is calculated as a difference between the actual vehicle orientation angle `psi` and a desired orientation. The desired orientation is an angle of the tangent line to the 3rd order polynomial curve `f(x)` or `arctan(f'(x))`. Since in the center of the coordinate system `x = 0`, the desired orientation is calculated `atan(f'(x)) = atan(coeffs[1])`. Also after the transformation of the coordinates the vehicle is heading in `x` direction and the orientation `psi = 0`, so `epsi = psi - atan(f'(x)) = -atan(coeff[1])`. 
+The vehicle orientation error `epsi` is calculated as a difference between the actual vehicle orientation angle `psi` and a desired orientation. The desired orientation is an angle of the tangent line to the 3rd order polynomial curve `f(x)` or `arctan(f'(x))`, where `f'(x)` is a derivative of the polinomial `f`. Since in the center of the coordinate system `x = 0`, the desired orientation is calculated `atan(f'(x)) = atan(coeffs[1])`. Also after the transformation of the coordinates the vehicle is heading in `x` direction and the orientation `psi = 0`, so `epsi = psi - atan(f'(x)) = -atan(coeff[1])`. 
 
-The resulting state vector passed to the MPC is `[0, 0, 0, v, cte, epsi]`. The MPC is using an optimizer to define the vehicle control inputs (actuators), steering angle `delta` and acceleration `a`, and to minimize the cost function.  
+The resulting state vector provided to the MPC is `[0, 0, 0, v, cte, epsi]`. The MPC is using an optimizer to calculate the vehicle control inputs (actuators), steering angle `delta` and acceleration `a`, and to minimize the cost function.  
 
 The kinematic model is using following equations to update the vehicle `state` after a timestep `dt`:
 ```cplusplus
@@ -80,13 +80,13 @@ The model is using 2 constraints as the actuator limitations of the steering ang
 
 #### Timestep Length and Elapsed Duration
 
-Initially I defined the elapsed duration `T = 10 sec` by chosing the the number of steps `N = 20` and the timestep length `dt = 0.5`. But I it was hard to keep the vehicle on track using those values and I reduced the duration to `T = 2 sec` by setting the timestep `dt = 0.1`. That caused oscillations of the vehicle which I considered as an effect of a computational delay. So I reduced the number of the computational steps to `N = 10`, that changed the predicted horizon to `T = 1 sec`. It gave me good control results at moderate speed of 40 mph. Later, to deal with the latency, I increased the `dt` keeping the same elapsed time. That slightly improved  stability of the vehicle. The final choosen value are `N = 8` and `dt = 1.25`. 
+Initially I defined the elapsed duration `T = 10 sec` by chosing the number of steps `N = 20` and the timestep length `dt = 0.5`. But it was hard to keep the vehicle on track using those values and I reduced the duration to `T = 2 sec` by setting the timestep `dt = 0.1`. That caused oscillations of the vehicle which I considered as an effect of a computational delay. So I reduced the number of the computational steps to `N = 10` changing the predicted horizon to `T = 1 sec`. It gave me good control results at moderate speed of 40 mph. Later, to deal with the latency, I increased the `dt` keeping the same elapsed time. That slightly improved  stability of the vehicle. The final choosen value are `N = 8` and `dt = 1.25`. 
 
 #### Polynomial Fitting and MPC Preprocessing
 
-The MPC is trying to minimize the cross track and orientation errors of the vehicle with respect to the road trajectory line. `polyfit` method is used to build a 3rd-order polynomial line `f(x)` from the waypoints as described earlier. The resulting polynomial is evaluated against the actual vehicle position by `polyeval` method to calculate the cross track error `cte` and the orientation error `epsi`. I defined the ojectives of the cost function in vector `fg` and passed it to the [Ipopt](https://projects.coin-or.org/Ipopt/) optimization `solve` method to find optimal actuator values that minimize `cte` and `epsi`.
+The MPC is trying to minimize the cross track and orientation errors of the vehicle trajectory with respect to the road trajectory line. `polyfit` method is used to build a 3rd-order polynomial line `f(x)` from the waypoints as described earlier. The resulting polynomial is evaluated against the actual vehicle position by `polyeval` method to calculate the cross track error `cte` and the orientation error `epsi`. I defined the ojectives of the cost function in vector `fg` and passed it to the [Ipopt](https://projects.coin-or.org/Ipopt/) optimization `solve` method to find optimal actuator values that minimize `cte` and `epsi`.
 
-Then I tuned the cost function by setting weights of the cost components . First I had to increase cost weights of the steering  `delta` atuation and the gaps beetween sequencial steering actuation in order to avoid erratic vehicle behavior. Then I increased the cost of `cte` and `epsi` to keep the vehicle on track. I set the reference speed to 100 mph and I found it very interesting how the optimizer was solving the problem with respect to the higher weight components ignoring the cost of speed, which has much lower weight. Such as the MPC could drop the vehicle speed on sharp curves (high `cte`) down to 30-40 mph and increase the speed beyond 90 mph on straght parts of the road. It looked very 'natural', like a human driver behavior. The final cost weight values are:
+Then I tuned the cost function by setting weights of the cost components . First I had to increase the cost weights of the steering  `delta` atuation and the gaps beetween sequential steering actuation in order to avoid erratic vehicle behavior. Then I increased the cost of `cte` and `epsi` to keep the vehicle on track. I set the reference speed to 100 mph and found it very interesting how the optimizer was solving the problem with respect to the higher weight components ignoring the cost of speed, which has much lower weight. Such as the MPC could 'automatically' drop the vehicle speed on sharp curves (high `cte`) down to 30-40 mph and increase the speed beyond 90 mph on straght parts of the road. It looked very 'natural', like a human driver behavior. On the other hand, it absolutely made sense considering the following selected cost weight values:
 
  Cost Component | Weight 
 :----------|-------:
@@ -101,7 +101,7 @@ Acceleration Change | 10
 
 #### Dealing with Latency
 
-After increasing the speed the oscillation issue had returned and I had to deal with the latency again. Too low `dt` value added oscillation and too high was increasing the vehicle offset. Using the vehicle model update equations, I added latency to the measurement data recieved from the simulator by predicting the vehicle `state` vector after `0.1 sec` timestep before feeding the MPC and increased the `dt` keeping the same elapsed time. That improved the vehicle control at higer speed.
+I had to deal with latency in order to solve the oscillation issue at high vehicle speed. Using the vehicle model update equations, I added latency to the measurement data recieved from the simulator by predicting the vehicle `state` vector after `dt = 0.1` before feeding the MPC, thanks to the forum [post](https://discussions.udacity.com/t/how-to-incorporate-latency-into-the-model/257391). I also increased the timestep length to `1.25` while keeping the same elapsed time. That improved the vehicle control at higer speed.
 
 ### Issues
 
