@@ -86,7 +86,7 @@ Initially I defined the elapsed duration `T = 10 sec` by chosing the number of s
 
 The MPC is trying to minimize the cross track and orientation errors of the vehicle trajectory with respect to the road trajectory line. `polyfit` method is used to build a 3rd-order polynomial line `f(x)` from the waypoints as described earlier. The resulting polynomial is evaluated against the actual vehicle position by `polyeval` method to calculate the cross track error `cte` and the orientation error `epsi`. I defined the ojectives of the cost function in vector `fg` and passed it to the [Ipopt](https://projects.coin-or.org/Ipopt/) optimization `solve` method to find optimal actuator values that minimize `cte` and `epsi`.
 
-Then I tuned the cost function by setting weights of the cost components . First I had to increase the cost weights of the steering  `delta` atuation and the gaps beetween sequential steering actuation in order to avoid erratic vehicle behavior. Then I increased the cost of `cte` and `epsi` to keep the vehicle on track. I set the reference speed to 100 mph and found it very interesting how the optimizer was solving the problem with respect to the higher weight components ignoring the cost of speed, which has much lower weight. Such as the MPC could 'automatically' drop the vehicle speed on sharp curves (high `cte`) down to 30-40 mph and increase the speed beyond 90 mph on straght parts of the road. It looked very 'natural', like a human driver behavior. On the other hand, it absolutely made sense considering the following selected cost weight values:
+Then I tuned the cost function by setting weights of the cost components . First I had to increase the cost weights of the steering  `delta` atuation and the gaps beetween sequential steering actuation in order to avoid erratic vehicle behavior. Then I increased the cost of `cte` and `epsi` to keep the vehicle on track. I set the reference speed to 100 mph and found it very interesting how the optimizer was solving the problem of minimizing the `cte` with high cost weight and ignoring the cost of speed, which has much lower weight. Such as the MPC could 'automatically' drop the vehicle speed on sharp curves down to 30-40 mph and increase the speed beyond 90 mph on straght parts of the road. It looked very 'natural', like a human driver behavior. But it makes a lot of sense considering the following selected cost weight values:
 
  Cost Component | Weight 
 :----------|-------:
@@ -102,7 +102,3 @@ Acceleration Change | 10
 #### Dealing with Latency
 
 I had to deal with latency in order to solve the oscillation issue at high vehicle speed. Using the vehicle model update equations, I added latency to the measurement data recieved from the simulator by predicting the vehicle `state` vector after `dt = 0.1` before feeding the MPC, thanks to the forum [post](https://discussions.udacity.com/t/how-to-incorporate-latency-into-the-model/257391). I also increased the timestep length to `1.25` while keeping the same elapsed time. That improved the vehicle control at higer speed.
-
-### Issues
-
-An error `"Segmentation fault (core dumped)"` is reported after `h.onDisconnection()` call.
